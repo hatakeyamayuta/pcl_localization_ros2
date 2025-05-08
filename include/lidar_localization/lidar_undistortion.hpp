@@ -17,8 +17,8 @@ public:
   // Ref:LeGO-LOAM(BSD-3 LICENSE)
   // https://github.com/RobustFieldAutonomyLab/LeGO-LOAM/blob/master/LeGO-LOAM/src/featureAssociation.cpp#L431-L459
   void getImu(
-    Eigen::Vector3f angular_velo, Eigen::Vector3f acc, const Eigen::Quaternionf quat,
-    const double imu_time /*[sec]*/)
+      Eigen::Vector3f angular_velo, Eigen::Vector3f acc, const Eigen::Quaternionf quat,
+      const double imu_time /*[sec]*/)
   {
     float roll, pitch, yaw;
     Eigen::Affine3f affine(quat);
@@ -26,7 +26,8 @@ public:
 
     imu_ptr_last_ = (imu_ptr_last_ + 1) % imu_que_length_;
 
-    if ((imu_ptr_last_ + 1) % imu_que_length_ == imu_ptr_front_) {
+    if ((imu_ptr_last_ + 1) % imu_que_length_ == imu_ptr_front_)
+    {
       imu_ptr_front_ = (imu_ptr_front_ + 1) % imu_que_length_;
     }
 
@@ -47,44 +48,45 @@ public:
 
     int imu_ptr_back = (imu_ptr_last_ - 1 + imu_que_length_) % imu_que_length_;
     double time_diff = imu_time_[imu_ptr_last_] - imu_time_[imu_ptr_back];
-    if (time_diff < scan_period_) {
+    if (time_diff < scan_period_)
+    {
       imu_shift_x_[imu_ptr_last_] =
-        imu_shift_x_[imu_ptr_back] + imu_velo_x_[imu_ptr_back] * time_diff + acc(0) * time_diff *
-        time_diff * 0.5;
+          imu_shift_x_[imu_ptr_back] + imu_velo_x_[imu_ptr_back] * time_diff + acc(0) * time_diff * time_diff * 0.5;
       imu_shift_y_[imu_ptr_last_] =
-        imu_shift_y_[imu_ptr_back] + imu_velo_y_[imu_ptr_back] * time_diff + acc(1) * time_diff *
-        time_diff * 0.5;
+          imu_shift_y_[imu_ptr_back] + imu_velo_y_[imu_ptr_back] * time_diff + acc(1) * time_diff * time_diff * 0.5;
       imu_shift_z_[imu_ptr_last_] =
-        imu_shift_z_[imu_ptr_back] + imu_velo_z_[imu_ptr_back] * time_diff + acc(2) * time_diff *
-        time_diff * 0.5;
+          imu_shift_z_[imu_ptr_back] + imu_velo_z_[imu_ptr_back] * time_diff + acc(2) * time_diff * time_diff * 0.5;
 
       imu_velo_x_[imu_ptr_last_] = imu_velo_x_[imu_ptr_back] + acc(0) * time_diff;
       imu_velo_y_[imu_ptr_last_] = imu_velo_y_[imu_ptr_back] + acc(1) * time_diff;
       imu_velo_z_[imu_ptr_last_] = imu_velo_z_[imu_ptr_back] + acc(2) * time_diff;
 
       imu_angular_rot_x_[imu_ptr_last_] = imu_angular_rot_x_[imu_ptr_back] + angular_velo(0) *
-        time_diff;
+                                                                                 time_diff;
       imu_angular_rot_y_[imu_ptr_last_] = imu_angular_rot_y_[imu_ptr_back] + angular_velo(1) *
-        time_diff;
+                                                                                 time_diff;
       imu_angular_rot_z_[imu_ptr_last_] = imu_angular_rot_z_[imu_ptr_back] + angular_velo(2) *
-        time_diff;
+                                                                                 time_diff;
     }
   }
 
   // Ref:LeGO-LOAM(BSD-3 LICENSE)
   // https://github.com/RobustFieldAutonomyLab/LeGO-LOAM/blob/master/LeGO-LOAM/src/featureAssociation.cpp#L491-L619
   void adjustDistortion(
-    pcl::PointCloud<pcl::PointXYZI>::Ptr & cloud,
-    const double scan_time /*[sec]*/)
+      pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
+      const double scan_time /*[sec]*/)
   {
     bool half_passed = false;
     int cloud_size = cloud->points.size();
 
     float start_ori = -std::atan2(cloud->points[0].y, cloud->points[0].x);
     float end_ori = -std::atan2(cloud->points[cloud_size - 1].y, cloud->points[cloud_size - 1].x);
-    if (end_ori - start_ori > 3 * M_PI) {
+    if (end_ori - start_ori > 3 * M_PI)
+    {
       end_ori -= 2 * M_PI;
-    } else if (end_ori - start_ori < M_PI) {
+    }
+    else if (end_ori - start_ori < M_PI)
+    {
       end_ori += 2 * M_PI;
     }
     float ori_diff = end_ori - start_ori;
@@ -94,40 +96,55 @@ public:
     Eigen::Matrix3f r_s_i, r_c;
     Eigen::Vector3f adjusted_p;
     float ori_h;
-    for (int i = 0; i < cloud_size; ++i) {
-      pcl::PointXYZI & p = cloud->points[i];
+    for (int i = 0; i < cloud_size; ++i)
+    {
+      pcl::PointXYZI &p = cloud->points[i];
       ori_h = -std::atan2(p.y, p.x);
-      if (!half_passed) {
-        if (ori_h < start_ori - M_PI * 0.5) {
+      if (!half_passed)
+      {
+        if (ori_h < start_ori - M_PI * 0.5)
+        {
           ori_h += 2 * M_PI;
-        } else if (ori_h > start_ori + M_PI * 1.5) {
+        }
+        else if (ori_h > start_ori + M_PI * 1.5)
+        {
           ori_h -= 2 * M_PI;
         }
 
-        if (ori_h - start_ori > M_PI) {
+        if (ori_h - start_ori > M_PI)
+        {
           half_passed = true;
         }
-      } else {
+      }
+      else
+      {
         ori_h += 2 * M_PI;
-        if (ori_h < end_ori - 1.5 * M_PI) {
+        if (ori_h < end_ori - 1.5 * M_PI)
+        {
           ori_h += 2 * M_PI;
-        } else if (ori_h > end_ori + 0.5 * M_PI) {
+        }
+        else if (ori_h > end_ori + 0.5 * M_PI)
+        {
           ori_h -= 2 * M_PI;
         }
       }
 
       float rel_time = (ori_h - start_ori) / ori_diff * scan_period_;
 
-      if (imu_ptr_last_ > 0) {
+      if (imu_ptr_last_ > 0)
+      {
         imu_ptr_front_ = imu_ptr_last_iter_;
-        while (imu_ptr_front_ != imu_ptr_last_) {
-          if (scan_time + rel_time > imu_time_[imu_ptr_front_]) {
+        while (imu_ptr_front_ != imu_ptr_last_)
+        {
+          if (scan_time + rel_time > imu_time_[imu_ptr_front_])
+          {
             break;
           }
           imu_ptr_front_ = (imu_ptr_front_ + 1) % imu_que_length_;
         }
 
-        if (scan_time + rel_time > imu_time_[imu_ptr_front_]) {
+        if (scan_time + rel_time > imu_time_[imu_ptr_front_])
+        {
           rpy_cur(0) = imu_roll_[imu_ptr_front_];
           rpy_cur(1) = imu_pitch_[imu_ptr_front_];
           rpy_cur(2) = imu_yaw_[imu_ptr_front_];
@@ -137,42 +154,46 @@ public:
           velo_cur(0) = imu_velo_x_[imu_ptr_front_];
           velo_cur(1) = imu_velo_y_[imu_ptr_front_];
           velo_cur(2) = imu_velo_z_[imu_ptr_front_];
-        } else {
+        }
+        else
+        {
           int imu_ptr_back = (imu_ptr_front_ - 1 + imu_que_length_) % imu_que_length_;
           float ratio_front = (scan_time + rel_time - imu_time_[imu_ptr_back]) /
-            (imu_time_[imu_ptr_front_] - imu_time_[imu_ptr_back]);
+                              (imu_time_[imu_ptr_front_] - imu_time_[imu_ptr_back]);
           float ratio_back = 1.0 - ratio_front;
           rpy_cur(0) = imu_roll_[imu_ptr_front_] * ratio_front + imu_roll_[imu_ptr_back] *
-            ratio_back;
+                                                                     ratio_back;
           rpy_cur(1) = imu_pitch_[imu_ptr_front_] * ratio_front + imu_pitch_[imu_ptr_back] *
-            ratio_back;
+                                                                      ratio_back;
           rpy_cur(2) = imu_yaw_[imu_ptr_front_] * ratio_front + imu_yaw_[imu_ptr_back] * ratio_back;
           shift_cur(0) = imu_shift_x_[imu_ptr_front_] * ratio_front + imu_shift_x_[imu_ptr_back] *
-            ratio_back;
+                                                                          ratio_back;
           shift_cur(1) = imu_shift_y_[imu_ptr_front_] * ratio_front + imu_shift_y_[imu_ptr_back] *
-            ratio_back;
+                                                                          ratio_back;
           shift_cur(2) = imu_shift_z_[imu_ptr_front_] * ratio_front + imu_shift_z_[imu_ptr_back] *
-            ratio_back;
+                                                                          ratio_back;
           velo_cur(0) = imu_velo_x_[imu_ptr_front_] * ratio_front + imu_velo_x_[imu_ptr_back] *
-            ratio_back;
+                                                                        ratio_back;
           velo_cur(1) = imu_velo_y_[imu_ptr_front_] * ratio_front + imu_velo_y_[imu_ptr_back] *
-            ratio_back;
+                                                                        ratio_back;
           velo_cur(2) = imu_velo_z_[imu_ptr_front_] * ratio_front + imu_velo_z_[imu_ptr_back] *
-            ratio_back;
+                                                                        ratio_back;
         }
 
-        r_c = (
-          Eigen::AngleAxisf(rpy_cur(2), Eigen::Vector3f::UnitZ()) *
-          Eigen::AngleAxisf(rpy_cur(1), Eigen::Vector3f::UnitY()) *
-          Eigen::AngleAxisf(rpy_cur(0), Eigen::Vector3f::UnitX())
-          ).toRotationMatrix();
+        r_c = (Eigen::AngleAxisf(rpy_cur(2), Eigen::Vector3f::UnitZ()) *
+               Eigen::AngleAxisf(rpy_cur(1), Eigen::Vector3f::UnitY()) *
+               Eigen::AngleAxisf(rpy_cur(0), Eigen::Vector3f::UnitX()))
+                  .toRotationMatrix();
 
-        if (i == 0) {
+        if (i == 0)
+        {
           rpy_start = rpy_cur;
           shift_start = shift_cur;
           velo_start = velo_cur;
           r_s_i = r_c.inverse();
-        } else {
+        }
+        else
+        {
           shift_from_start = shift_cur - shift_start - velo_start * rel_time;
           adjusted_p = r_s_i * (r_c * Eigen::Vector3f(p.x, p.y, p.z) + shift_from_start);
           p.x = adjusted_p.x();
@@ -183,7 +204,6 @@ public:
       imu_ptr_last_iter_ = imu_ptr_front_;
     }
   }
-
 
   void setScanPeriod(const double scan_period /*[sec]*/)
   {
@@ -218,4 +238,4 @@ private:
   std::array<float, imu_que_length_> imu_angular_rot_z_;
 };
 
-#endif  // LIDAR_UNDISTORTION_HPP_
+#endif // LIDAR_UNDISTORTION_HPP_

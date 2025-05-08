@@ -41,7 +41,7 @@ using namespace std::chrono_literals;
 class PCLLocalization : public rclcpp_lifecycle::LifecycleNode
 {
 public:
-  explicit PCLLocalization(const rclcpp::NodeOptions & options);
+  explicit PCLLocalization(const rclcpp::NodeOptions &options);
 
   using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
@@ -49,8 +49,8 @@ public:
   CallbackReturn on_activate(const rclcpp_lifecycle::State &);
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State &);
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State &);
-  CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state);
-  CallbackReturn on_error(const rclcpp_lifecycle::State & state);
+  CallbackReturn on_shutdown(const rclcpp_lifecycle::State &state);
+  CallbackReturn on_error(const rclcpp_lifecycle::State &state);
 
   void initializeParameters();
   void initializePubSub();
@@ -68,21 +68,21 @@ public:
   tf2_ros::TransformListener tflistener_;
 
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::ConstSharedPtr
-    initial_pose_sub_;
+      initial_pose_sub_;
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
-    pose_pub_;
+      pose_pub_;
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr
-    path_pub_;
+      path_pub_;
   rclcpp_lifecycle::LifecyclePublisher<sensor_msgs::msg::PointCloud2>::SharedPtr
-    initial_map_pub_;
+      initial_map_pub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::ConstSharedPtr
-    map_sub_;
+      map_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::ConstSharedPtr
-    odom_sub_;
+      odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::ConstSharedPtr
-    cloud_sub_;
+      cloud_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::ConstSharedPtr
-    imu_sub_;
+      imu_sub_;
 
   boost::shared_ptr<pcl::Registration<pcl::PointXYZI, pcl::PointXYZI>> registration_;
   pcl::VoxelGrid<pcl::PointXYZI> voxel_grid_filter_;
