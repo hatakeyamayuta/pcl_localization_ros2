@@ -58,7 +58,7 @@ CallbackReturn PCLLocalization::on_activate(const rclcpp_lifecycle::State &)
 
   pose_pub_->on_activate();
   path_pub_->on_activate();
-  initial_map_pub_->on_activate();
+  // initial_map_pub_->on_activate();
 
   if (set_initial_pose_)
   {
@@ -91,8 +91,8 @@ CallbackReturn PCLLocalization::on_activate(const rclcpp_lifecycle::State &)
 
     sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
     pcl::toROSMsg(*map_cloud_ptr, *map_msg_ptr);
-    map_msg_ptr->header.frame_id = global_frame_id_;
-    initial_map_pub_->publish(*map_msg_ptr);
+    // map_msg_ptr->header.frame_id = global_frame_id_;
+    //  initial_map_pub_->publish(*map_msg_ptr);
     RCLCPP_INFO(get_logger(), "Initial Map Published");
 
     if (registration_method_ == "GICP" || registration_method_ == "GICP_OMP")
@@ -120,7 +120,7 @@ CallbackReturn PCLLocalization::on_deactivate(const rclcpp_lifecycle::State &)
 
   pose_pub_->on_deactivate();
   path_pub_->on_deactivate();
-  initial_map_pub_->on_deactivate();
+  // initial_map_pub_->on_deactivate();
 
   RCLCPP_INFO(get_logger(), "Deactivating end");
   return CallbackReturn::SUCCESS;
@@ -130,7 +130,7 @@ CallbackReturn PCLLocalization::on_cleanup(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Cleaning Up");
   initial_pose_sub_.reset();
-  initial_map_pub_.reset();
+  // initial_map_pub_.reset();
   path_pub_.reset();
   pose_pub_.reset();
   odom_sub_.reset();
@@ -216,19 +216,20 @@ void PCLLocalization::initializePubSub()
 
   path_pub_ = create_publisher<nav_msgs::msg::Path>(
       "path", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
-
+  /*
   initial_map_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
       "initial_map",
       rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
-
+    */
   initial_pose_sub_ = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
       "initialpose", rclcpp::SystemDefaultsQoS(),
       std::bind(&PCLLocalization::initialPoseReceived, this, std::placeholders::_1));
 
+  /*
   map_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       "map", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
       std::bind(&PCLLocalization::mapReceived, this, std::placeholders::_1));
-
+  */
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       "odom", rclcpp::SensorDataQoS(),
       std::bind(&PCLLocalization::odomReceived, this, std::placeholders::_1));
@@ -361,11 +362,13 @@ void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr
     RCLCPP_WARN(this->get_logger(), "odom time interval is too large");
     return;
   }
-  if (dt_odom < 0.0 /* [sec] */)
+
+  if (dt_odom <= 0.0 /* [sec] */)
   {
     RCLCPP_WARN(this->get_logger(), "odom time interval is negative");
     return;
   }
+  std::cout << "dt_odom: " << dt_odom << std::endl;
 
   tf2::Quaternion previous_quat_tf;
   double roll, pitch, yaw;
