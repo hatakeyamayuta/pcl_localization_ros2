@@ -368,8 +368,6 @@ void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr
     RCLCPP_WARN(this->get_logger(), "odom time interval is negative");
     return;
   }
-  std::cout << "dt_odom: " << dt_odom << std::endl;
-
   tf2::Quaternion previous_quat_tf;
   double roll, pitch, yaw;
   tf2::fromMsg(corrent_pose_with_cov_stamped_ptr_->pose.pose.orientation, previous_quat_tf);
