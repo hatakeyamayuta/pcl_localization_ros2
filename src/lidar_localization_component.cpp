@@ -1,10 +1,10 @@
+#include <cmath>
 #include <lidar_localization/lidar_localization_component.hpp>
+#include <ratio>
 PCLLocalization::PCLLocalization(const rclcpp::NodeOptions &options)
     : rclcpp_lifecycle::LifecycleNode("lidar_localization", options),
-      clock_(RCL_ROS_TIME),
-      tfbuffer_(std::make_shared<rclcpp::Clock>(clock_)),
-      tflistener_(tfbuffer_),
-      broadcaster_(this)
+      clock_(RCL_ROS_TIME), tfbuffer_(std::make_shared<rclcpp::Clock>(clock_)),
+      tflistener_(tfbuffer_), broadcaster_(this)
 {
   declare_parameter("global_frame_id", "map");
   declare_parameter("odom_frame_id", "odom");
@@ -215,8 +215,7 @@ void PCLLocalization::initializePubSub()
       rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
 
   path_pub_ = create_publisher<nav_msgs::msg::Path>(
-      "path",
-      rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
+      "path", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
 
   initial_map_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
       "initial_map",
@@ -378,6 +377,13 @@ void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr
   pitch += msg->twist.twist.angular.y * dt_odom;
   yaw += msg->twist.twist.angular.z * dt_odom;
 
+  if (roll == NAN || pitch == NAN || yaw == NAN)
+  {
+    RCLCPP_WARN(this->get_logger(), "roll, pitch, yaw has NaN");
+    roll = 0.0;
+    pitch = 0.0;
+    yaw = 0.0;
+  }
   Eigen::Quaterniond quat_eig =
       Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
       Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
@@ -385,11 +391,13 @@ void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr
 
   geometry_msgs::msg::Quaternion quat_msg = tf2::toMsg(quat_eig);
 
-  Eigen::Vector3d odom{
-      msg->twist.twist.linear.x,
-      msg->twist.twist.linear.y,
-      msg->twist.twist.linear.z};
+  Eigen::Vector3d odom{msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z};
   Eigen::Vector3d delta_position = quat_eig.matrix() * dt_odom * odom;
+  if (delta_position.hasNaN())
+  {
+    RCLCPP_WARN(this->get_logger(), "delta_position has NaN");
+    delta_position.setZero();
+  }
 
   corrent_pose_with_cov_stamped_ptr_->pose.pose.position.x += delta_position.x();
   corrent_pose_with_cov_stamped_ptr_->pose.pose.position.y += delta_position.y();
@@ -408,8 +416,7 @@ void PCLLocalization::imuReceived(const sensor_msgs::msg::Imu::ConstSharedPtr ms
 
   try
   {
-    const geometry_msgs::msg::TransformStamped transform = tfbuffer_.lookupTransform(
-        base_frame_id_, msg->header.frame_id, tf2::TimePointZero);
+    const geometry_msgs::msg::TransformStamped transform = tfbuffer_.lookupTransform(base_frame_id_, msg->header.frame_id, tf2::TimePointZero);
 
     geometry_msgs::msg::Vector3Stamped angular_velocity, linear_acceleration, transformed_angular_velocity, transformed_linear_acceleration;
     geometry_msgs::msg::Quaternion transformed_quaternion;
@@ -456,8 +463,7 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
 
   if (use_imu_)
   {
-    double received_time = msg->header.stamp.sec +
-                           msg->header.stamp.nanosec * 1e-9;
+    double received_time = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
     lidar_undistortion_.adjustDistortion(cloud_ptr, received_time);
   }
 
@@ -482,6 +488,11 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
   tf2::fromMsg(corrent_pose_with_cov_stamped_ptr_->pose.pose, affine);
 
   Eigen::Matrix4f init_guess = affine.matrix().cast<float>();
+  if (init_guess.hasNaN())
+  {
+    RCLCPP_WARN(this->get_logger(), "init_guess has NaN");
+    init_guess.setIdentity();
+  }
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZI>);
   rclcpp::Clock system_clock;
@@ -522,7 +533,38 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
   transform_stamped.transform.translation.y = static_cast<double>(final_transformation(1, 3));
   transform_stamped.transform.translation.z = static_cast<double>(final_transformation(2, 3));
   transform_stamped.transform.rotation = quat_msg;
-  broadcaster_.sendTransform(transform_stamped);
+
+  geometry_msgs::msg::TransformStamped odom_to_base_link;
+
+  try
+  {
+    // Lookup the transform from odom to base_link
+    odom_to_base_link = tfbuffer_.lookupTransform(
+        odom_frame_id_, base_frame_id_, tf2::TimePointZero);
+  }
+  catch (tf2::TransformException &ex)
+  {
+    RCLCPP_WARN(this->get_logger(), "Failed to lookup transform: %s",
+                ex.what());
+    return;
+  }
+
+  auto odom_to_base_link_mat =
+      tf2::transformToEigen(odom_to_base_link.transform);
+
+  auto map_to_base_link_mat =
+      tf2::transformToEigen(transform_stamped.transform);
+
+  auto map_to_odom_mat = map_to_base_link_mat * odom_to_base_link_mat.inverse();
+
+  auto tf_eigen = tf2::eigenToTransform(map_to_odom_mat);
+
+  geometry_msgs::msg::TransformStamped map_to_odom;
+  map_to_odom.header.stamp = msg->header.stamp;
+  map_to_odom.header.frame_id = global_frame_id_;
+  map_to_odom.child_frame_id = odom_frame_id_;
+  map_to_odom.transform = tf_eigen.transform;
+  broadcaster_.sendTransform(map_to_odom);
 
   geometry_msgs::msg::PoseStamped::SharedPtr pose_stamped_ptr(new geometry_msgs::msg::PoseStamped);
   pose_stamped_ptr->header.stamp = msg->header.stamp;

@@ -16,39 +16,43 @@ import lifecycle_msgs.msg
 
 from ament_index_python.packages import get_package_share_directory
 
+
 def generate_launch_description():
 
     ld = launch.LaunchDescription()
 
     lidar_tf = launch_ros.actions.Node(
-        name='lidar_tf',
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0','0','0','0','0','0','1','base_link','velodyne']
-        )
+        name="lidar_tf",
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=["0", "0", "0", "0", "0", "0", "1", "base_link", "livox_frame"],
+    )
 
     imu_tf = launch_ros.actions.Node(
-        name='imu_tf',
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0','0','0','0','0','0','1','base_link','imu_link']
-        )
+        name="imu_tf",
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=["0", "0", "0", "0", "0", "0", "1", "base_link", "livox_frame"],
+    )
 
     localization_param_dir = launch.substitutions.LaunchConfiguration(
-        'localization_param_dir',
+        "localization_param_dir",
         default=os.path.join(
-            get_package_share_directory('lidar_localization_ros2'),
-            'param',
-            'localization.yaml'))
+            get_package_share_directory("lidar_localization_ros2"),
+            "param",
+            "localization.yaml",
+        ),
+    )
 
     lidar_localization = launch_ros.actions.LifecycleNode(
-        name='lidar_localization',
-        namespace='',
-        package='lidar_localization_ros2',
-        executable='lidar_localization_node',
+        name="lidar_localization",
+        namespace="",
+        package="lidar_localization_ros2",
+        executable="lidar_localization_node",
         parameters=[localization_param_dir],
-        remappings=[('/cloud','/velodyne_points')],
-        output='screen')
+        remappings=[("/cloud", "/livox/lidar"), ("/odom", "/dlio/odom_node/odom")],
+        output="screen",
+    )
 
     to_inactive = launch.actions.EmitEvent(
         event=launch_ros.events.lifecycle.ChangeState(
@@ -60,13 +64,17 @@ def generate_launch_description():
     from_unconfigured_to_inactive = launch.actions.RegisterEventHandler(
         launch_ros.event_handlers.OnStateTransition(
             target_lifecycle_node=lidar_localization,
-            goal_state='unconfigured',
+            goal_state="unconfigured",
             entities=[
                 launch.actions.LogInfo(msg="-- Unconfigured --"),
-                launch.actions.EmitEvent(event=launch_ros.events.lifecycle.ChangeState(
-                    lifecycle_node_matcher=launch.events.matches_action(lidar_localization),
-                    transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE,
-                )),
+                launch.actions.EmitEvent(
+                    event=launch_ros.events.lifecycle.ChangeState(
+                        lifecycle_node_matcher=launch.events.matches_action(
+                            lidar_localization
+                        ),
+                        transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE,
+                    )
+                ),
             ],
         )
     )
@@ -74,14 +82,18 @@ def generate_launch_description():
     from_inactive_to_active = launch.actions.RegisterEventHandler(
         launch_ros.event_handlers.OnStateTransition(
             target_lifecycle_node=lidar_localization,
-            start_state = 'configuring',
-            goal_state='inactive',
+            start_state="configuring",
+            goal_state="inactive",
             entities=[
                 launch.actions.LogInfo(msg="-- Inactive --"),
-                launch.actions.EmitEvent(event=launch_ros.events.lifecycle.ChangeState(
-                    lifecycle_node_matcher=launch.events.matches_action(lidar_localization),
-                    transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE,
-                )),
+                launch.actions.EmitEvent(
+                    event=launch_ros.events.lifecycle.ChangeState(
+                        lifecycle_node_matcher=launch.events.matches_action(
+                            lidar_localization
+                        ),
+                        transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE,
+                    )
+                ),
             ],
         )
     )
@@ -90,7 +102,7 @@ def generate_launch_description():
     ld.add_action(from_inactive_to_active)
 
     ld.add_action(lidar_localization)
-    ld.add_action(lidar_tf)
+    # ld.add_action(lidar_tf)
     ld.add_action(to_inactive)
 
     return ld
