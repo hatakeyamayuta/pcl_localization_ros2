@@ -302,6 +302,10 @@ void PCLLocalization::initializeRegistration()
 
 void PCLLocalization::initialPoseReceived(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
 {
+  if (initialpose_recieved_)
+  {
+    return;
+  }
   RCLCPP_INFO(get_logger(), "initialPoseReceived");
   if (msg->header.frame_id != global_frame_id_)
   {
@@ -312,7 +316,7 @@ void PCLLocalization::initialPoseReceived(const geometry_msgs::msg::PoseWithCova
   corrent_pose_with_cov_stamped_ptr_ = msg;
   pose_pub_->publish(*corrent_pose_with_cov_stamped_ptr_);
 
-  cloudReceived(last_scan_ptr_);
+  // cloudReceived(last_scan_ptr_);
   RCLCPP_INFO(get_logger(), "initialPoseReceived end");
 }
 
