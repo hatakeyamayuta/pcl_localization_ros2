@@ -351,7 +351,7 @@ void PCLLocalization::mapReceived(const sensor_msgs::msg::PointCloud2::SharedPtr
 
 void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 {
-  if (!use_odom_)
+  if (!use_odom_ || !initialpose_recieved_)
   {
     return;
   }
