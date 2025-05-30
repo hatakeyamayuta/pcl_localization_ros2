@@ -58,7 +58,7 @@ CallbackReturn PCLLocalization::on_activate(const rclcpp_lifecycle::State &)
 
   pose_pub_->on_activate();
   path_pub_->on_activate();
-  // initial_map_pub_->on_activate();
+  initial_map_pub_->on_activate();
 
   if (set_initial_pose_)
   {
@@ -91,8 +91,8 @@ CallbackReturn PCLLocalization::on_activate(const rclcpp_lifecycle::State &)
 
     sensor_msgs::msg::PointCloud2::SharedPtr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
     pcl::toROSMsg(*map_cloud_ptr, *map_msg_ptr);
-    // map_msg_ptr->header.frame_id = global_frame_id_;
-    //  initial_map_pub_->publish(*map_msg_ptr);
+    map_msg_ptr->header.frame_id = global_frame_id_;
+    initial_map_pub_->publish(*map_msg_ptr);
     RCLCPP_INFO(get_logger(), "Initial Map Published");
 
     if (registration_method_ == "GICP" || registration_method_ == "GICP_OMP")
@@ -120,7 +120,7 @@ CallbackReturn PCLLocalization::on_deactivate(const rclcpp_lifecycle::State &)
 
   pose_pub_->on_deactivate();
   path_pub_->on_deactivate();
-  // initial_map_pub_->on_deactivate();
+  initial_map_pub_->on_deactivate();
 
   RCLCPP_INFO(get_logger(), "Deactivating end");
   return CallbackReturn::SUCCESS;
@@ -130,7 +130,7 @@ CallbackReturn PCLLocalization::on_cleanup(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Cleaning Up");
   initial_pose_sub_.reset();
-  // initial_map_pub_.reset();
+  initial_map_pub_.reset();
   path_pub_.reset();
   pose_pub_.reset();
   odom_sub_.reset();
@@ -216,11 +216,10 @@ void PCLLocalization::initializePubSub()
 
   path_pub_ = create_publisher<nav_msgs::msg::Path>(
       "path", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
-  /*
+
   initial_map_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
       "initial_map",
       rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
-    */
   initial_pose_sub_ = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
       "initialpose", rclcpp::SystemDefaultsQoS(),
       std::bind(&PCLLocalization::initialPoseReceived, this, std::placeholders::_1));
@@ -230,6 +229,10 @@ void PCLLocalization::initializePubSub()
       "map", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
       std::bind(&PCLLocalization::mapReceived, this, std::placeholders::_1));
   */
+
+  ekf_pose_sub_ = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+      "ekf_pose", rclcpp::SensorDataQoS(),
+      std::bind(&PCLLocalization::ekfPoseReceived, this, std::placeholders::_1));
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       "odom", rclcpp::SensorDataQoS(),
       std::bind(&PCLLocalization::odomReceived, this, std::placeholders::_1));
@@ -327,7 +330,7 @@ void PCLLocalization::mapReceived(const sensor_msgs::msg::PointCloud2::SharedPtr
 
   if (msg->header.frame_id != global_frame_id_)
   {
-    RCLCPP_WARN(this->get_logger(), "map_frame_id does not match　global_frame_id");
+    RCLCPP_WARN(this->get_logger(), "map_frame_id does not match global_frame_id");
     return;
   }
 
@@ -347,6 +350,17 @@ void PCLLocalization::mapReceived(const sensor_msgs::msg::PointCloud2::SharedPtr
 
   map_recieved_ = true;
   RCLCPP_INFO(get_logger(), "mapReceived end");
+}
+
+void PCLLocalization::ekfPoseReceived(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
+{
+  RCLCPP_INFO(get_logger(), "ekfPoseReceived");
+  if (msg->header.frame_id != global_frame_id_)
+  {
+    RCLCPP_WARN(this->get_logger(), "ekf_pose_frame_id does not match global_frame_id");
+    return;
+  }
+  ekf_pose_with_cov_stamped_ptr_ = msg;
 }
 
 void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -507,6 +521,25 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
 
   bool has_converged = registration_->hasConverged();
   double fitness_score = registration_->getFitnessScore();
+  /*
+  if (!has_converged || fitness_score > score_threshold_)
+  {
+    RCLCPP_WARN(get_logger(), "The registration didn't converge.");
+    if (ekf_pose_with_cov_stamped_ptr_)
+    {
+      corrent_pose_with_cov_stamped_ptr_ = ekf_pose_with_cov_stamped_ptr_;
+      corrent_pose_with_cov_stamped_ptr_->header.stamp = msg->header.stamp;
+      corrent_pose_with_cov_stamped_ptr_->header.frame_id = global_frame_id_;
+      RCLCPP_WARN(get_logger(), "Falling back to EKF pose.");
+    }
+    else
+    {
+      RCLCPP_WARN(get_logger(), "No EKF pose available to fallback to.");
+    }
+    return;
+  }
+  */
+
   if (!has_converged)
   {
     RCLCPP_WARN(get_logger(), "The registration didn't converge.");
@@ -515,6 +548,7 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
   if (fitness_score > score_threshold_)
   {
     RCLCPP_WARN(get_logger(), "The fitness score is over %lf.", score_threshold_);
+    return;
   }
 
   Eigen::Matrix4f final_transformation = registration_->getFinalTransformation();
